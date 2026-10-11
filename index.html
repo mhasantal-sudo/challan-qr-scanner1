@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>চালান QR স্ক্যানার</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 25px auto;
+      padding: 16px;
+      background: #f4f7fb;
+      color: #172033;
+    }
+    h2 { text-align: center; }
+    button {
+      width: 100%;
+      padding: 13px;
+      margin: 8px 0;
+      border: 0;
+      border-radius: 8px;
+      background: #126b45;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #reader {
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+    }
+    #result {
+      overflow-wrap: anywhere;
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>চালান QR স্ক্যানার</h2>
+  <p>ক্যামেরা চালু করে চালানের QR কোড স্ক্যান করুন।</p>
+
+  <div id="reader"></div>
+
+  <p id="result">এখনো কোনো QR স্ক্যান করা হয়নি।</p>
+
+  <button onclick="startScanner()">📷 ক্যামেরা চালু করুন</button>
+  <button onclick="stopScanner()">⏹ ক্যামেরা বন্ধ করুন</button>
+  <button onclick="copyResult()">📋 ফলাফল কপি করুন</button>
+
+  <script>
+    let scanner = null;
+    let running = false;
+    let scannedText = "";
+
+    function startScanner() {
+      if (!window.isSecureContext ||
+          !navigator.mediaDevices ||
+          !navigator.mediaDevices.getUserMedia) {
+        document.getElementById("result").textContent =
+          "নিরাপদ HTTPS পেজ থেকে খুলুন এবং Chrome ব্যবহার করুন।";
+        return;
+      }
+
+      if (running) return;
+
+      scanner = new Html5Qrcode("reader");
+
+      scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        function(decodedText) {
+          scannedText = decodedText;
+          document.getElementById("result").textContent =
+            "স্ক্যান সফল: " + decodedText;
+          stopScanner();
+        },
+        function() {}
+      ).then(function() {
+        running = true;
+        document.getElementById("result").textContent =
+          "ক্যামেরা চালু হয়েছে। QR কোড ফ্রেমের মধ্যে ধরুন।";
+      }).catch(function(error) {
+        document.getElementById("result").textContent =
+          "ক্যামেরা চালু হয়নি: " + error;
+      });
+    }
+
+    function stopScanner() {
+      if (scanner && running) {
+        scanner.stop().then(function() {
+          running = false;
+          scanner.clear();
+        }).catch(function(error) {
+          document.getElementById("result").textContent =
+            "ক্যামেরা বন্ধ করতে সমস্যা: " + error;
+        });
+      }
+    }
+
+    function copyResult() {
+      if (!scannedText) {
+        alert("আগে QR কোড স্ক্যান করুন।");
+        return;
+      }
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(scannedText)
+          .then(function() { alert("QR তথ্য কপি হয়েছে।"); })
+          .catch(function() { prompt("QR তথ্য কপি করুন:", scannedText); });
+      } else {
+        prompt("QR তথ্য কপি করুন:", scannedText);
+      }
+    }
+  </script>
+</body>
+</html>
