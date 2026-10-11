@@ -5,7 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>চালান QR স্ক্যানার</title>
- <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
+  <script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+
   <style>
     body {
       font-family: sans-serif;
@@ -25,7 +27,11 @@
       background: #126b45;
       color: white;
       font-size: 16px;
-      cursor: pointer;
+    }
+    video {
+      width: 100%;
+      max-height: 65vh;
+      object-fit: contain;
     }
     #reader {
       background: white;
@@ -40,13 +46,16 @@
     }
   </style>
 </head>
+
 <body>
   <h2>চালান QR স্ক্যানার</h2>
   <p>ক্যামেরা চালু করে চালানের QR কোড স্ক্যান করুন।</p>
 
-  <div id="reader"></div>
+  <div id="reader">
+    <video id="video" playsinline></video>
+  </div>
 
-  <p id="result">এখনো কোনো QR স্ক্যান করা হয়নি।</p>
+  <p id="result">স্ক্যান করার জন্য ক্যামেরা চালু করুন।</p>
 
   <button onclick="startScanner()">📷 ক্যামেরা চালু করুন</button>
   <button onclick="stopScanner()">⏹ ক্যামেরা বন্ধ করুন</button>
@@ -57,49 +66,63 @@
     let running = false;
     let scannedText = "";
 
-    function startScanner() {
-      if (!window.isSecureContext ||
-          !navigator.mediaDevices ||
-          !navigator.mediaDevices.getUserMedia) {
-        document.getElementById("result").textContent =
-          "নিরাপদ HTTPS পেজ থেকে খুলুন এবং Chrome ব্যবহার করুন।";
-        return;
-      }
+    async function startScanner() {
+      const result = document.getElementById("result");
+      const video = document.getElementById("video");
 
       if (running) return;
 
-      scanner = new Html5Qrcode("reader");
+      if (typeof ZXing === "undefined") {
+        result.textContent =
+          "ZXing লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করুন।";
+        return;
+      }
 
-      scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
-        function(decodedText) {
-          scannedText = decodedText;
-          document.getElementById("result").textContent =
-            "স্ক্যান সফল: " + decodedText;
-          stopScanner();
-        },
-        function() {}
-      ).then(function() {
+      if (!navigator.mediaDevices ||
+          !navigator.mediaDevices.getUserMedia) {
+        result.textContent =
+          "Chrome-এ HTTPS ওয়েবসাইট খুলে আবার চেষ্টা করুন।";
+        return;
+      }
+
+      try {
+        result.textContent = "ক্যামেরা চালু হচ্ছে...";
+
+        scanner = new ZXing.BrowserMultiFormatReader();
+
         running = true;
-        document.getElementById("result").textContent =
-          "ক্যামেরা চালু হয়েছে। QR কোড ফ্রেমের মধ্যে ধরুন।";
-      }).catch(function(error) {
-        document.getElementById("result").textContent =
-          "ক্যামেরা চালু হয়নি: " + error;
-      });
+
+        await scanner.decodeFromVideoDevice(
+          undefined,
+          video,
+          function(scanResult, error) {
+            if (scanResult && running) {
+              scannedText = scanResult.getText();
+
+              result.textContent = "স্ক্যান সফল: " + scannedText;
+
+              stopScanner();
+            }
+          }
+        );
+
+        result.textContent =
+          "ক্যামেরা চালু হয়েছে। QR কোডটি ফ্রেমের মধ্যে ধরুন।";
+
+      } catch (error) {
+        running = false;
+        result.textContent =
+          "সমস্যা: " + (error.message || error);
+      }
     }
 
     function stopScanner() {
-      if (scanner && running) {
-        scanner.stop().then(function() {
-          running = false;
-          scanner.clear();
-        }).catch(function(error) {
-          document.getElementById("result").textContent =
-            "ক্যামেরা বন্ধ করতে সমস্যা: " + error;
-        });
+      if (scanner) {
+        scanner.reset();
+        scanner = null;
       }
+
+      running = false;
     }
 
     function copyResult() {
@@ -110,8 +133,12 @@
 
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(scannedText)
-          .then(function() { alert("QR তথ্য কপি হয়েছে।"); })
-          .catch(function() { prompt("QR তথ্য কপি করুন:", scannedText); });
+          .then(function() {
+            alert("QR তথ্য কপি হয়েছে।");
+          })
+          .catch(function() {
+            prompt("QR তথ্য কপি করুন:", scannedText);
+          });
       } else {
         prompt("QR তথ্য কপি করুন:", scannedText);
       }
