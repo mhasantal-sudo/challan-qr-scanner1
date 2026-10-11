@@ -96,13 +96,41 @@
           undefined,
           video,
           function(scanResult, error) {
-            if (scanResult && running) {
-              scannedText = scanResult.getText();
+         if (scanResult && running) {
+  scannedText = scanResult.getText().trim();
 
-              result.textContent = "স্ক্যান সফল: " + scannedText;
+  let challanNo = "";
 
-              stopScanner();
-            }
+  try {
+    const qrUrl = new URL(scannedText);
+    challanNo = qrUrl.searchParams.get("challanNo") || "";
+  } catch (e) {
+    // QR-এ সরাসরি চালান নম্বর থাকলে
+    const match = scannedText.match(/\b\d{4}-\d{10}\b/);
+    challanNo = match ? match[0] : "";
+  }
+
+  // CNO: 2324-0008576476 ধরনের QR-ও সমর্থন করবে
+  if (!challanNo) {
+    const match = scannedText.match(/\b\d{4}-\d{10}\b/);
+    challanNo = match ? match[0] : "";
+  }
+
+  if (!/^\d{4}-\d{10}$/.test(challanNo)) {
+    result.textContent =
+      "সঠিক চালান নম্বর পাওয়া যায়নি। আবার QR স্ক্যান করুন।";
+    return;
+  }
+
+  result.textContent = "চালান শনাক্ত হয়েছে: " + challanNo;
+  stopScanner();
+
+  const appUrl =
+    "https://script.google.com/macros/s/AKfycbzcreUxsmcC98M070kHdDW9HZuno3Vse-IWFl_xx3e1EyANMYhM5aMZWwiehjYB1szhsA/exec";
+
+  window.location.href =
+    appUrl + "?challanNo=" + encodeURIComponent(challanNo);
+}
           }
         );
 
