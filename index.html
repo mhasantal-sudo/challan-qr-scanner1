@@ -6,42 +6,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>চালান QR স্ক্যানার</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
+  <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
+
   <style>
+    * { box-sizing: border-box; }
+
     body {
       font-family: sans-serif;
       max-width: 600px;
-      margin: 25px auto;
-      padding: 16px;
+      margin: 20px auto;
+      padding: 14px;
       background: #f4f7fb;
       color: #172033;
     }
 
     h2 { text-align: center; }
 
-    button {
+    #reader {
+      position: relative;
+      overflow: hidden;
       width: 100%;
-      padding: 13px;
-      margin: 8px 0;
-      border: 0;
-      border-radius: 8px;
-      background: #126b45;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
+      background: #111;
+      border-radius: 12px;
     }
 
     video {
+      display: block;
       width: 100%;
-      max-height: 65vh;
+      height: auto;
+      min-height: 240px;
       object-fit: contain;
       background: #111;
     }
 
-    #reader {
-      background: white;
-      padding: 10px;
-      border-radius: 10px;
+    #scanBox {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 65%;
+      aspect-ratio: 1;
+      transform: translate(-50%, -50%);
+      border: 0;
+      pointer-events: none;
+    }
+
+    .corner {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-color: #27f58b;
+      border-style: solid;
+    }
+
+    .tl {
+      top: 0; left: 0;
+      border-width: 4px 0 0 4px;
+      border-radius: 8px 0 0 0;
+    }
+
+    .tr {
+      top: 0; right: 0;
+      border-width: 4px 4px 0 0;
+      border-radius: 0 8px 0 0;
+    }
+
+    .bl {
+      bottom: 0; left: 0;
+      border-width: 0 0 4px 4px;
+      border-radius: 0 0 0 8px;
+    }
+
+    .br {
+      bottom: 0; right: 0;
+      border-width: 0 4px 4px 0;
+      border-radius: 0 0 8px 0;
     }
 
     #result {
@@ -50,21 +88,41 @@
       padding: 12px;
       border-radius: 8px;
     }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      margin: 7px 0;
+      border: 0;
+      border-radius: 8px;
+      background: #126b45;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button.stop { background: #8b2635; }
   </style>
 </head>
 
 <body>
   <h2>চালান QR স্ক্যানার</h2>
-  <p>ক্যামেরা চালু করে চালানের QR কোড স্ক্যান করুন।</p>
+  <p>QR কোডটি মাঝের সবুজ বক্সের মধ্যে রাখুন।</p>
 
   <div id="reader">
-    <video id="video" playsinline autoplay muted></video>
+    <video id="video" playsinline muted></video>
+    <div id="scanBox">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+    </div>
   </div>
 
   <p id="result">স্ক্যান করার জন্য ক্যামেরা চালু করুন।</p>
 
   <button onclick="startScanner()">📷 ক্যামেরা চালু করুন</button>
-  <button onclick="stopScanner()">⏹ ক্যামেরা বন্ধ করুন</button>
+  <button class="stop" onclick="stopScanner()">⏹ ক্যামেরা বন্ধ করুন</button>
   <button onclick="copyResult()">📋 ফলাফল কপি করুন</button>
 
   <script>
@@ -82,45 +140,33 @@
         return;
       }
 
-      if (typeof ZXing === "undefined") {
-        result.textContent = "ZXing লাইব্রেরি লোড হয়নি।";
+      if (typeof QrScanner === "undefined") {
+        result.textContent = "QR Scanner লাইব্রেরি লোড হয়নি।";
         return;
       }
 
-      if (!navigator.mediaDevices ||
-          !navigator.mediaDevices.getUserMedia) {
-        result.textContent = "HTTPS ওয়েবসাইটে Chrome দিয়ে খুলুন।";
+      if (!navigator.mediaDevices?.getUserMedia) {
+        result.textContent = "HTTPS ওয়েবসাইট Chrome-এ খুলুন।";
         return;
       }
 
       try {
         result.textContent = "পেছনের ক্যামেরা চালু হচ্ছে...";
-
-        const hints = new Map();
-        hints.set(
-          ZXing.DecodeHintType.POSSIBLE_FORMATS,
-          [ZXing.BarcodeFormat.QR_CODE]
-        );
-        hints.set(ZXing.DecodeHintType.TRY_HARDER, false);
-
-        scanner = new ZXing.BrowserMultiFormatReader(hints, 150);
         scanHandled = false;
-        running = true;
 
-        await scanner.decodeFromConstraints(
-          {
-            audio: false,
-          video: {
-  facingMode: { ideal: "environment" },
-  width: { ideal: 1280 },
-  height: { ideal: 720 },
-  frameRate: { ideal: 24, max: 30 }
-}          },
+        QrScanner.WORKER_PATH =
+          "https://unpkg.com/qr-scanner@1.4.2/qr-scanner-worker.min.js";
+
+        scanner = new QrScanner(
           video,
-          function(scanResult, error) {
-            if (!scanResult || !running || scanHandled) return;
+          function(scanResult) {
+            if (!running || scanHandled) return;
 
-            scannedText = scanResult.getText().trim();
+            scannedText = (
+              typeof scanResult === "string"
+                ? scanResult
+                : scanResult.data
+            ).trim();
 
             let challanNo = "";
 
@@ -156,19 +202,61 @@
             window.location.href =
               appUrl + "?challanNo=" +
               encodeURIComponent(challanNo);
+          },
+          {
+            preferredCamera: "environment",
+            maxScansPerSecond: 20,
+            highlightScanRegion: false,
+            highlightCodeOutline: false,
+
+            calculateScanRegion: function(video) {
+              const size = Math.round(
+                Math.min(video.videoWidth, video.videoHeight) * 0.65
+              );
+
+              const x = Math.round(
+                (video.videoWidth - size) / 2
+              );
+
+              const y = Math.round(
+                (video.videoHeight - size) / 2
+              );
+
+              const box = document.getElementById("scanBox");
+              box.style.width =
+                (size / video.videoWidth * 100) + "%";
+
+              return {
+                x: x,
+                y: y,
+                width: size,
+                height: size,
+                downScaledWidth: 500,
+                downScaledHeight: 500
+              };
+            }
           }
         );
 
+        running = true;
+        await scanner.start();
+
         if (running) {
           result.textContent =
-            "ক্যামেরা চালু। QR কোডটি ফ্রেমে ধরে স্থির রাখুন।";
+            "ক্যামেরা চালু। QR কোড সবুজ বক্সের মধ্যে রাখুন।";
         }
 
       } catch (error) {
         running = false;
 
+        if (scanner) {
+          scanner.destroy();
+          scanner = null;
+        }
+
         result.textContent =
-          "ক্যামেরা চালু হয়নি: " + (error.message || error);
+          "ক্যামেরা চালু হয়নি: " +
+          (error.message || error);
       }
     }
 
@@ -176,7 +264,8 @@
       running = false;
 
       if (scanner) {
-        scanner.reset();
+        scanner.stop();
+        scanner.destroy();
         scanner = null;
       }
     }
