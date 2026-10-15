@@ -73,117 +73,100 @@
     let scannedText = "";
     let scanHandled = false;
 
-    async function startScanner() {
-      const result = document.getElementById("result");
-      const video = document.getElementById("video");
+   <script>
+async function startScanner() {
+  const result = document.getElementById("result");
+  const video = document.getElementById("video");
 
-      if (running) {
-        result.textContent = "ক্যামেরা ইতিমধ্যে চালু আছে।";
-        return;
+  if (running) {
+    result.textContent = "ক্যামেরা ইতিমধ্যে চালু আছে।";
+    return;
+  }
+
+  if (typeof ZXing === "undefined") {
+    result.textContent = "ZXing লাইব্রেরি লোড হয়নি।";
+    return;
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    result.textContent = "HTTPS ওয়েবসাইটে Chrome দিয়ে খুলুন।";
+    return;
+  }
+
+  try {
+    result.textContent = "ক্যামেরা চালু হচ্ছে...";
+
+    const hints = new Map();
+    hints.set(
+      ZXing.DecodeHintType.POSSIBLE_FORMATS,
+      [ZXing.BarcodeFormat.QR_CODE]
+    );
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, false);
+
+    scanner = new ZXing.BrowserMultiFormatReader(hints, 150);
+    scanHandled = false;
+    running = true;
+
+    await scanner.decodeFromConstraints(
+      {
+        audio: false,
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      },
+      video,
+      function(scanResult, error) {
+        if (!scanResult || !running || scanHandled) return;
+
+        scannedText = scanResult.getText().trim();
+
+        let challanNo = "";
+
+        try {
+          const qrUrl = new URL(scannedText);
+          challanNo = qrUrl.searchParams.get("challanNo") || "";
+        } catch (e) {
+          // QR-এ সরাসরি চালান নম্বর থাকলেও কাজ করবে
+        }
+
+        if (!challanNo) {
+          const match = scannedText.match(/\b\d{4}-\d{10}\b/);
+          challanNo = match ? match[0] : "";
+        }
+
+        if (!/^\d{4}-\d{10}$/.test(challanNo)) {
+          result.textContent =
+            "QR পড়া গেছে, কিন্তু সঠিক চালান নম্বর পাওয়া যায়নি।";
+          return;
+        }
+
+        scanHandled = true;
+        result.textContent = "চালান শনাক্ত হয়েছে: " + challanNo;
+
+        stopScanner();
+
+        const appUrl =
+          "https://script.google.com/macros/s/AKfycbzcreUxsmcC98M070kHdDW9HZuno3Vse-IWFl_xx3e1EyANMYhM5aMZWwiehjYB1szhsA/exec";
+
+        window.location.href =
+          appUrl + "?challanNo=" + encodeURIComponent(challanNo);
       }
+    );
 
-      if (typeof ZXing === "undefined") {
-        result.textContent = "ZXing লাইব্রেরি লোড হয়নি।";
-        return;
-      }
-
-      if (!navigator.mediaDevices ||
-          !navigator.mediaDevices.getUserMedia) {
-        result.textContent =
-          "Chrome-এ HTTPS ওয়েবসাইট খুলে আবার চেষ্টা করুন।";
-        return;
-      }
-
-      try {
-        result.textContent = "পেছনের ক্যামেরা চালু হচ্ছে...";
-
-        scanner = new ZXing.BrowserMultiFormatReader(
-          new ZXing.Hints(),
-          150
-        );
-
-        // সাধারণ বারকোড নয়, শুধু QR কোড শনাক্ত করবে।
-        const hints = new Map();
-        hints.set(
-          ZXing.DecodeHintType.POSSIBLE_FORMATS,
-          [ZXing.BarcodeFormat.QR_CODE]
-        );
-        hints.set(
-          ZXing.DecodeHintType.TRY_HARDER,
-          false
-        );
-
-        scanner = new ZXing.BrowserMultiFormatReader(hints, 150);
-        scanHandled = false;
-
-        await scanner.decodeFromConstraints(
-          {
-            audio: false,
-            video: {
-              facingMode: { ideal: "environment" },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
-          video,
-          function(scanResult, error) {
-            if (!scanResult || !running || scanHandled) return;
-
-            scannedText = scanResult.getText().trim();
-
-            let challanNo = "";
-
-            try {
-              const qrUrl = new URL(scannedText);
-              challanNo =
-                qrUrl.searchParams.get("challanNo") || "";
-            } catch (e) {
-              // QR-এ সরাসরি চালান নম্বর থাকলে
-            }
-
-            if (!challanNo) {
-              const match =
-                scannedText.match(/\b\d{4}-\d{10}\b/);
-              challanNo = match ? match[0] : "";
-            }
-
-            if (!/^\d{4}-\d{10}$/.test(challanNo)) {
-              result.textContent =
-                "QR পড়া গেছে, কিন্তু সঠিক চালান নম্বর পাওয়া যায়নি।";
-              return;
-            }
-
-            scanHandled = true;
-            running = false;
-
-            result.textContent =
-              "চালান শনাক্ত হয়েছে: " + challanNo;
-
-            stopScanner();
-
-            const appUrl =
-              "https://script.google.com/macros/s/AKfycbzcreUxsmcC98M070kHdDW9HZuno3Vse-IWFl_xx3e1EyANMYhM5aMZWwiehjYB1szhsA/exec";
-
-            window.location.href =
-              appUrl + "?challanNo=" +
-              encodeURIComponent(challanNo);
-          }
-        );
-
-        running = true;
-
-        result.textContent =
-          "ক্যামেরা চালু। QR কোডটি কাছে ধরে স্থির রাখুন।";
-
-      } catch (error) {
-        running = false;
-
-        result.textContent =
-          "ক্যামেরা চালু হয়নি: " +
-          (error.message || error);
-      }
+    if (running) {
+      result.textContent =
+        "ক্যামেরা চালু। QR কোডটি ফ্রেমে ধরে স্থির রাখুন।";
     }
 
+  } catch (error) {
+    running = false;
+
+    result.textContent =
+      "ক্যামেরা চালু হয়নি: " + (error.message || error);
+  }
+}
     function stopScanner() {
       running = false;
 
