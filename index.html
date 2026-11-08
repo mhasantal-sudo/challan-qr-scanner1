@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>চালান QR স্ক্যানার</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>if(typeof jsQR==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"><\/script>');}</script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #0f172a; color: #fff;
@@ -115,7 +116,7 @@ async function detectFromSource(source, w, h) {
   canvas.height = Math.round(h * scale);
   ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const res = jsQR(img.data, img.width, img.height,
+  const res = (typeof jsQR==='undefined') ? null : jsQR(img.data, img.width, img.height,
     { inversionAttempts: 'attemptBoth' });
   return res ? res.data : null;
 }
@@ -189,7 +190,7 @@ document.getElementById('photoInput').addEventListener('change', async function 
       }
       if (!text) {
         const img = ctx.getImageData(0, 0, w, h);
-        const r = jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' });
+        const r = (typeof jsQR==='undefined') ? null : jsQR(img.data, w, h, { inversionAttempts: 'attemptBoth' });
         if (r) text = r.data;
       }
       if (text && handleDecoded(text)) return;
