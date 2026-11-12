@@ -7,31 +7,57 @@
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>if(typeof jsQR==="undefined"){document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jsqr/1.4.0/jsQR.min.js"><\/script>');}</script>
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #0f172a; color: #fff;
-    font-family: "Noto Sans Bengali", Arial, sans-serif; }
+  :root { --c1: #0f9d7a; --c2: #0b7a8f; --accent: #22c55e; }
+  body.tax { --c1: #f59e0b; --c2: #e8590c; --accent: #fbbf24; }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; min-height: 100%; color: #fff;
+    font-family: "Hind Siliguri", "Noto Sans Bengali", Arial, sans-serif; }
+  body {
+    background: radial-gradient(900px 500px at 50% -10%, #3b2f8f 0%, #1b1f4b 45%, #0f172a 100%);
+    background-attachment: fixed;
+  }
   .wrap { max-width: 560px; margin: auto; padding: 14px; }
-  h1 { font-size: 19px; margin: 6px 0 12px; text-align: center; }
-  .viewer { position: relative; border-radius: 14px; overflow: hidden;
-    background: #000; aspect-ratio: 3 / 4; }
+
+  .head {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 14px; border-radius: 16px; margin-bottom: 12px;
+    background: linear-gradient(120deg, var(--c1), var(--c2));
+    box-shadow: 0 10px 26px rgba(0,0,0,.35);
+  }
+  .head h1 { margin: 0; font-size: 18px; }
+  .head .badge { background: rgba(255,255,255,.22); padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+
+  .viewer { position: relative; border-radius: 18px; overflow: hidden;
+    background: #000; aspect-ratio: 3 / 4; border: 2px solid rgba(255,255,255,.12); }
   video { width: 100%; height: 100%; object-fit: cover; }
-  .frame { position: absolute; inset: 12%; border: 3px solid #22c55e;
-    border-radius: 14px; box-shadow: 0 0 0 999px #00000055; pointer-events: none; }
+  .frame { position: absolute; inset: 12%; border: 3px solid var(--accent);
+    border-radius: 16px; box-shadow: 0 0 0 999px #00000066, 0 0 18px var(--accent); pointer-events: none; }
+
   button, .btn { display: block; width: 100%; margin-top: 10px; padding: 14px;
-    font-size: 16px; font-weight: bold; border: 0; border-radius: 10px;
-    color: #fff; background: #176b45; text-align: center; cursor: pointer; }
-  .blue { background: #2457a7; }
-  .gray { background: #475569; }
-  #status { margin-top: 12px; padding: 12px; border-radius: 10px;
-    background: #1e293b; overflow-wrap: anywhere; line-height: 1.6; }
-  #manual { width: 100%; padding: 12px; font-size: 15px; border-radius: 8px;
-    border: 0; margin-top: 10px; }
+    font-size: 16px; font-weight: 800; border: 0; border-radius: 12px;
+    color: #fff; text-align: center; cursor: pointer; font-family: inherit;
+    transition: transform .08s, filter .15s; }
+  button:hover, .btn:hover { filter: brightness(1.08); }
+  button:active, .btn:active { transform: translateY(1px); }
+  #startBtn { background: linear-gradient(135deg, var(--c1), var(--c2)); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+  .blue { background: linear-gradient(135deg, #3b82f6, #6d4fd6); box-shadow: 0 6px 18px rgba(0,0,0,.3); }
+  .gray { background: linear-gradient(135deg, #64748b, #475569); }
+
+  #status { margin-top: 12px; padding: 12px; border-radius: 12px;
+    background: rgba(255,255,255,.1); border-left: 4px solid var(--accent);
+    overflow-wrap: anywhere; line-height: 1.6; font-size: 14px; white-space: pre-line; }
+  #manual { width: 100%; padding: 13px; font-size: 15px; border-radius: 12px;
+    border: 0; margin-top: 10px; font-family: inherit; }
   input[type=file] { display: none; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>চালানের QR কোড স্ক্যান করুন</h1>
+  <div class="head">
+    <h1>চালান QR স্ক্যান</h1>
+    <span class="badge" id="badge">মূল চালান</span>
+  </div>
 
   <div class="viewer">
     <video id="video" playsinline muted autoplay></video>
@@ -50,8 +76,15 @@
 </div>
 
 <script>
-/* ★ এখানে আপনার Apps Script Web App-এর /exec লিংক বসান ★ */
+/* ★ আপনার Apps Script Web App-এর /exec লিংক ★ */
 const APP_URL = 'https://script.google.com/macros/s/AKfycbzcreUxsmcC98M070kHdDW9HZuno3Vse-IWFl_xx3e1EyANMYhM5aMZWwiehjYB1szhsA/exec';
+
+/* অ্যাপ থেকে আসা t: tax = আয়কর বক্স, নইলে মূল বক্স */
+const T = new URLSearchParams(location.search).get('t') === 'tax' ? 'tax' : 'main';
+if (T === 'tax') {
+  document.body.classList.add('tax');
+  document.getElementById('badge').textContent = 'আয়কর চালান';
+}
 
 const video = document.getElementById('video');
 const statusBox = document.getElementById('status');
@@ -88,7 +121,7 @@ function goToApp(challanNo) {
   stopCamera();
   if (navigator.vibrate) navigator.vibrate(150);
   say('চালান নম্বর পাওয়া গেছে: ' + challanNo + '\nতথ্য ফর্মে পাঠানো হচ্ছে...');
-  window.location.href = APP_URL + '?challanNo=' + encodeURIComponent(challanNo);
+  window.location.href = APP_URL + '?challanNo=' + encodeURIComponent(challanNo) + '&t=' + T;
 }
 
 function handleDecoded(text) {
@@ -159,7 +192,7 @@ async function startCamera() {
     } catch (e) {}
 
     running = true;
-    say('QR কোডটি সবুজ ফ্রেমের ভেতরে ধরুন। ফোন একটু দূরে-কাছে করে ফোকাস মেলান।');
+    say('QR কোডটি ফ্রেমের ভেতরে ধরুন। ফোন একটু দূরে-কাছে করে ফোকাস মেলান।');
     scanLoop();
   } catch (err) {
     say('ক্যামেরা চালু হয়নি: ' + (err.message || err) +
